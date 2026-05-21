@@ -1,0 +1,39 @@
+.dsh-sticky-target {
+  --dsh-anim-duration: 260ms;
+  --dsh-anim-easing: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dsh-sticky-placeholder {
+  display: block;
+  width: 100%;
+  pointer-events: none;
+}
+
+.dsh-sticky-target.dsh-is-sticky {
+  position: fixed !important;
+  right: auto;
+  z-index: 9999;
+  margin: 0 !important;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+.dsh-sticky-target.dsh-anim-fade-in-down {
+  animation-name: dshFadeInDown;
+  animation-duration: var(--dsh-anim-duration);
+  animation-timing-function: var(--dsh-anim-easing);
+  animation-fill-mode: both;
+}
+
+@keyframes dshFadeInDown {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -18px, 0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
