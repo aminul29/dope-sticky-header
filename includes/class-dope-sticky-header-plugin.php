@@ -144,9 +144,29 @@ final class Dope_Sticky_Header_Plugin {
 		);
 
 		$element->add_control(
+			'dsh_scroll_reveal_type',
+			array(
+				'label'   => esc_html__( 'Reveal Behavior', 'dope-sticky-header' ),
+				'type'    => Controls_Manager::SELECT,
+				'options' => array(
+					'standard'      => esc_html__( 'Standard Sticky', 'dope-sticky-header' ),
+					'direction'     => esc_html__( 'Slide In on Scroll Up (CSS)', 'dope-sticky-header' ),
+					'scroll_linked' => esc_html__( 'Interactive Scroll-Linked (JS)', 'dope-sticky-header' ),
+				),
+				'default' => 'standard',
+				'condition' => array(
+					'dsh_enable_sticky' => 'yes',
+				),
+				'frontend_available' => true,
+				'render_type'      => 'none',
+			)
+		);
+
+		// Retained for backwards-compatibility with saved pages
+		$element->add_control(
 			'dsh_direction_aware',
 			array(
-				'label'            => esc_html__( 'Direction-Aware (Hide on Scroll Down)', 'dope-sticky-header' ),
+				'label'            => esc_html__( 'Direction-Aware [Deprecated]', 'dope-sticky-header' ),
 				'type'             => Controls_Manager::SWITCHER,
 				'label_on'         => esc_html__( 'Yes', 'dope-sticky-header' ),
 				'label_off'        => esc_html__( 'No', 'dope-sticky-header' ),
@@ -154,6 +174,7 @@ final class Dope_Sticky_Header_Plugin {
 				'default'          => '',
 				'condition'        => array(
 					'dsh_enable_sticky' => 'yes',
+					'dsh_scroll_reveal_type' => 'standard', // Only show if standard to avoid UI clutter
 				),
 				'frontend_available' => true,
 				'render_type'      => 'none',
@@ -301,7 +322,15 @@ final class Dope_Sticky_Header_Plugin {
 			$easing = 'cubic-bezier(0.22,1,0.36,1)';
 		}
 
+		$reveal_type = (string) $element->get_settings_for_display( 'dsh_scroll_reveal_type' );
 		$direction_aware = $element->get_settings_for_display( 'dsh_direction_aware' );
+		if ( empty( $reveal_type ) || 'standard' === $reveal_type ) {
+			if ( 'yes' === $direction_aware ) {
+				$reveal_type = 'direction';
+			} else {
+				$reveal_type = 'standard';
+			}
+		}
 
 		$native_sticky = $element->get_settings( 'sticky' );
 		if ( ! empty( $native_sticky ) ) {
@@ -320,7 +349,8 @@ final class Dope_Sticky_Header_Plugin {
 		$element->add_render_attribute( '_wrapper', 'data-dsh-easing', $easing );
 		$element->add_render_attribute( '_wrapper', 'data-dsh-devices', implode( ',', array_map( 'sanitize_key', $devices ) ) );
 		$element->add_render_attribute( '_wrapper', 'data-dsh-had-native', ! empty( $native_sticky ) ? 'yes' : 'no' );
-		$element->add_render_attribute( '_wrapper', 'data-dsh-direction-aware', 'yes' === $direction_aware ? 'yes' : 'no' );
+		$element->add_render_attribute( '_wrapper', 'data-dsh-direction-aware', 'direction' === $reveal_type ? 'yes' : 'no' );
+		$element->add_render_attribute( '_wrapper', 'data-dsh-reveal-type', $reveal_type );
 
 		$this->enqueue_assets_once();
 	}

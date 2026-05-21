@@ -22,6 +22,10 @@
               top 200ms var(--dsh-anim-easing);
 }
 
+.dsh-sticky-target.dsh-is-sticky.dsh-interactive-scroll {
+  transition: none !important;
+}
+
 .dsh-sticky-target.dsh-is-sticky.dsh-sticky-hide {
   transform: translateY(-100%) translateZ(0);
   opacity: 0;

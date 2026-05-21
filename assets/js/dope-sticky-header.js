@@ -72,7 +72,11 @@
       if (!currentPassed && instance.isSticky) {
         var isHidden = instance.el.classList.contains("dsh-sticky-hide");
         if (!isHidden) {
-          offset += instance.height + instance.marginTop + instance.marginBottom;
+          var currentTranslateY = instance.currentTranslateY || 0;
+          var factor = instance.height > 0 ? (instance.height + currentTranslateY) / instance.height : 0;
+          if (factor < 0) factor = 0;
+          if (factor > 1) factor = 1;
+          offset += (instance.height + instance.marginTop + instance.marginBottom) * factor;
         }
       }
     });
@@ -109,7 +113,13 @@
 
     el.classList.add("dsh-is-sticky");
 
-    if (instance.animation !== "none") {
+    if (instance.revealType === "scroll_linked") {
+      el.classList.add("dsh-interactive-scroll");
+      instance.currentTranslateY = 0;
+      el.style.transform = "translateY(0px) translateZ(0)";
+      el.style.opacity = "1";
+      el.style.pointerEvents = "";
+    } else if (instance.animation !== "none") {
       el.classList.remove("dsh-anim-fade-in-down");
       void el.offsetWidth;
       if (instance.animation === "fade_in_down") {
@@ -132,15 +142,20 @@
     el.classList.remove("dsh-is-sticky");
     el.classList.remove("dsh-anim-fade-in-down");
     el.classList.remove("dsh-sticky-hide");
+    el.classList.remove("dsh-interactive-scroll");
     el.style.removeProperty("top");
     el.style.removeProperty("left");
     el.style.removeProperty("width");
+    el.style.removeProperty("transform");
+    el.style.removeProperty("opacity");
+    el.style.removeProperty("pointer-events");
 
     placeholder.style.height = "0px";
     placeholder.style.removeProperty("margin-top");
     placeholder.style.removeProperty("margin-bottom");
 
     instance.isSticky = false;
+    instance.currentTranslateY = 0;
     updateStickyPositions();
   }
 
@@ -186,30 +201,48 @@
 
       var delta = scrollY - instance.lastScrollY;
 
-      // Accumulate scroll distance in the current direction to smooth out recoil/bounce
-      if (delta > 0) {
-        if (instance.scrollAccumulator < 0) {
-          instance.scrollAccumulator = 0;
-        }
-        instance.scrollAccumulator += delta;
-      } else if (delta < 0) {
-        if (instance.scrollAccumulator > 0) {
-          instance.scrollAccumulator = 0;
-        }
-        instance.scrollAccumulator += delta;
-      }
+      if (instance.revealType === "scroll_linked") {
+        var maxOffset = -instance.height;
+        var prevTranslateY = instance.currentTranslateY;
+        instance.currentTranslateY = Math.max(maxOffset, Math.min(0, instance.currentTranslateY - delta));
 
-      // If direction-aware, hide on scroll down (with 20px tolerance), show on scroll up (with 15px tolerance)
-      if (instance.directionAware) {
-        var toleranceDown = 20;
-        var toleranceUp = 15;
-        if (instance.scrollAccumulator > toleranceDown && scrollY > stickyThreshold + 100) {
-          hideSticky(instance);
-        } else if (instance.scrollAccumulator < -toleranceUp) {
-          showSticky(instance);
+        if (instance.currentTranslateY !== prevTranslateY) {
+          var factor = instance.height > 0 ? (instance.height + instance.currentTranslateY) / instance.height : 0;
+          if (factor < 0) factor = 0;
+          if (factor > 1) factor = 1;
+
+          instance.el.style.transform = "translateY(" + instance.currentTranslateY + "px) translateZ(0)";
+          instance.el.style.opacity = factor;
+          instance.el.style.pointerEvents = factor === 0 ? "none" : "";
+
+          updateStickyPositions();
         }
       } else {
-        showSticky(instance);
+        // Accumulate scroll distance in the current direction to smooth out recoil/bounce
+        if (delta > 0) {
+          if (instance.scrollAccumulator < 0) {
+            instance.scrollAccumulator = 0;
+          }
+          instance.scrollAccumulator += delta;
+        } else if (delta < 0) {
+          if (instance.scrollAccumulator > 0) {
+            instance.scrollAccumulator = 0;
+          }
+          instance.scrollAccumulator += delta;
+        }
+
+        // If direction-aware (CSS-driven), hide on scroll down (with 20px tolerance), show on scroll up (with 15px tolerance)
+        if (instance.revealType === "direction") {
+          var toleranceDown = 20;
+          var toleranceUp = 15;
+          if (instance.scrollAccumulator > toleranceDown && scrollY > stickyThreshold + 100) {
+            hideSticky(instance);
+          } else if (instance.scrollAccumulator < -toleranceUp) {
+            showSticky(instance);
+          }
+        } else {
+          showSticky(instance);
+        }
       }
     } else {
       if (instance.isSticky) {
@@ -290,7 +323,11 @@
     el.style.setProperty("--dsh-anim-duration", duration + "ms");
     el.style.setProperty("--dsh-anim-easing", easing);
 
+    var revealType = el.getAttribute("data-dsh-reveal-type") || "standard";
     var directionAware = el.getAttribute("data-dsh-direction-aware") === "yes";
+    if (revealType === "standard" && directionAware) {
+      revealType = "direction";
+    }
 
     var instance = {
       el: el,
@@ -299,6 +336,7 @@
       animation: el.getAttribute("data-dsh-down-animation") || "fade_in_down",
       devices: devices.length ? devices : ["desktop", "tablet", "mobile"],
       directionAware: directionAware,
+      revealType: revealType,
       anchorTop: 0,
       left: 0,
       width: 0,
@@ -306,6 +344,7 @@
       isSticky: false,
       lastScrollY: window.scrollY || window.pageYOffset || 0,
       scrollAccumulator: 0,
+      currentTranslateY: 0,
     };
 
     measure(instance);
