@@ -181,6 +181,22 @@ final class Dope_Sticky_Header_Plugin {
 		);
 
 		$element->add_control(
+			'dsh_sticky_up_hide_distance',
+			array(
+				'label'              => esc_html__( 'Up Hide Distance (px)', 'dope-sticky-header' ),
+				'type'               => Controls_Manager::NUMBER,
+				'default'            => 250,
+				'min'                => 0,
+				'step'               => 1,
+				'condition'          => array(
+					'dsh_enable_sticky' => 'yes',
+				),
+				'frontend_available' => true,
+				'render_type'        => 'none',
+			)
+		);
+
+		$element->add_control(
 			'dsh_sticky_down_animation',
 			array(
 				'label'              => esc_html__( 'Scroll Down Animation', 'dope-sticky-header' ),
@@ -271,6 +287,9 @@ final class Dope_Sticky_Header_Plugin {
 		$delay = $element->get_settings_for_display( 'dsh_sticky_delay' );
 		$delay = is_numeric( $delay ) ? max( 0, (int) $delay ) : 0;
 
+		$up_hide_distance = $element->get_settings_for_display( 'dsh_sticky_up_hide_distance' );
+		$up_hide_distance = is_numeric( $up_hide_distance ) ? max( 0, (int) $up_hide_distance ) : 250;
+
 		$animation = (string) $element->get_settings_for_display( 'dsh_sticky_down_animation' );
 		if ( '' === $animation ) {
 			$animation = 'fade_in_down';
@@ -296,6 +315,7 @@ final class Dope_Sticky_Header_Plugin {
 		$element->add_render_attribute( '_wrapper', 'class', 'dsh-sticky-target' );
 		$element->add_render_attribute( '_wrapper', 'data-dsh-enabled', 'yes' );
 		$element->add_render_attribute( '_wrapper', 'data-dsh-delay', (string) $delay );
+		$element->add_render_attribute( '_wrapper', 'data-dsh-up-hide-distance', (string) $up_hide_distance );
 		$element->add_render_attribute( '_wrapper', 'data-dsh-down-animation', $animation );
 		$element->add_render_attribute( '_wrapper', 'data-dsh-duration', (string) $duration );
 		$element->add_render_attribute( '_wrapper', 'data-dsh-easing', $easing );

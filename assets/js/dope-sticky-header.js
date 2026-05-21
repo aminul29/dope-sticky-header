@@ -5,6 +5,8 @@
   var rafSyncRequested = false;
   var resizeTimer = null;
   var SCROLL_DELTA_THRESHOLD = 2;
+  var REENTER_SCROLL_GUARD = 24;
+  var MAX_EXIT_DURATION = 320;
 
   function parseIntSafe(value, fallback) {
     var parsed = Number(value);
@@ -32,12 +34,37 @@
       return 0;
     }
 
-    var isFixed = window.getComputedStyle(adminBar).position === "fixed";
-    if (!isFixed) {
+    if (window.getComputedStyle(adminBar).position !== "fixed") {
       return 0;
     }
 
     return adminBar.offsetHeight || 0;
+  }
+
+  function clearInstanceTimers(instance) {
+    if (instance.entryFallbackTimer) {
+      window.clearTimeout(instance.entryFallbackTimer);
+      instance.entryFallbackTimer = null;
+    }
+
+    if (instance.exitFallbackTimer) {
+      window.clearTimeout(instance.exitFallbackTimer);
+      instance.exitFallbackTimer = null;
+    }
+  }
+
+  function removeInstanceAnimationListeners(instance) {
+    var el = instance.el;
+
+    if (instance.entryEndHandler) {
+      el.removeEventListener("animationend", instance.entryEndHandler);
+      instance.entryEndHandler = null;
+    }
+
+    if (instance.exitEndHandler) {
+      el.removeEventListener("animationend", instance.exitEndHandler);
+      instance.exitEndHandler = null;
+    }
   }
 
   function measure(instance) {
@@ -55,51 +82,174 @@
     instance.anchorTop = rect.top + (window.scrollY || window.pageYOffset || 0);
   }
 
-  function applySticky(instance) {
-    if (instance.isSticky) {
+  function finalizeEntry(instance) {
+    if (!instance.isSticky) {
+      instance.state = "normal";
       return;
     }
 
-    var el = instance.el;
-    var placeholder = instance.placeholder;
-    var adminOffset = getAdminBarOffset();
-
-    measure(instance);
-
-    placeholder.style.height = instance.height + "px";
-    el.style.width = instance.width + "px";
-    el.style.left = instance.left + "px";
-    el.style.top = adminOffset + "px";
-
-    el.classList.add("dsh-is-sticky");
-
-    if (instance.animation !== "none") {
-      el.classList.remove("dsh-anim-fade-in-down");
-      void el.offsetWidth;
-      if (instance.animation === "fade_in_down") {
-        el.classList.add("dsh-anim-fade-in-down");
-      }
-    }
-
-    instance.isSticky = true;
+    instance.el.classList.remove("dsh-anim-fade-in-down");
+    instance.state = "stuck";
   }
 
-  function clearSticky(instance) {
-    if (!instance.isSticky) {
-      return;
-    }
-
+  function finishClearSticky(instance) {
     var el = instance.el;
     var placeholder = instance.placeholder;
+
+    removeInstanceAnimationListeners(instance);
+    clearInstanceTimers(instance);
 
     el.classList.remove("dsh-is-sticky");
     el.classList.remove("dsh-anim-fade-in-down");
+    el.classList.remove("dsh-anim-slide-up-out");
     el.style.removeProperty("top");
     el.style.removeProperty("left");
     el.style.removeProperty("width");
     placeholder.style.height = "0px";
 
     instance.isSticky = false;
+    instance.state = "normal";
+    instance.lastExitScrollY = window.scrollY || window.pageYOffset || 0;
+  }
+
+  function cancelExit(instance) {
+    if (instance.state !== "exiting") {
+      return;
+    }
+
+    removeInstanceAnimationListeners(instance);
+    clearInstanceTimers(instance);
+    instance.el.classList.remove("dsh-anim-slide-up-out");
+    instance.state = "stuck";
+  }
+
+  function applySticky(instance) {
+    var el = instance.el;
+    var placeholder = instance.placeholder;
+
+    if (instance.state === "exiting") {
+      cancelExit(instance);
+    }
+
+    if (instance.isSticky) {
+      if (instance.state === "normal") {
+        instance.state = "stuck";
+      }
+      return;
+    }
+
+    removeInstanceAnimationListeners(instance);
+    clearInstanceTimers(instance);
+
+    measure(instance);
+
+    placeholder.style.height = instance.height + "px";
+    el.style.width = instance.width + "px";
+    el.style.left = instance.left + "px";
+    el.style.top = getAdminBarOffset() + "px";
+
+    el.classList.remove("dsh-anim-slide-up-out");
+    el.classList.add("dsh-is-sticky");
+
+    instance.isSticky = true;
+
+    if (instance.animation === "fade_in_down" && instance.duration > 0) {
+      instance.state = "entering";
+      el.classList.remove("dsh-anim-fade-in-down");
+      void el.offsetWidth;
+      el.classList.add("dsh-anim-fade-in-down");
+
+      instance.entryEndHandler = function (event) {
+        if (event.target !== el) {
+          return;
+        }
+        finalizeEntry(instance);
+      };
+
+      el.addEventListener("animationend", instance.entryEndHandler);
+
+      instance.entryFallbackTimer = window.setTimeout(function () {
+        finalizeEntry(instance);
+      }, instance.duration + 80);
+
+      return;
+    }
+
+    el.classList.remove("dsh-anim-fade-in-down");
+    instance.state = "stuck";
+  }
+
+  function startExit(instance) {
+    var el = instance.el;
+    var exitDuration = Math.min(instance.duration, MAX_EXIT_DURATION);
+
+    if (!instance.isSticky) {
+      finishClearSticky(instance);
+      return;
+    }
+
+    if (instance.state === "exiting") {
+      return;
+    }
+
+    removeInstanceAnimationListeners(instance);
+    clearInstanceTimers(instance);
+
+    el.classList.remove("dsh-anim-fade-in-down");
+
+    if (exitDuration <= 0) {
+      finishClearSticky(instance);
+      return;
+    }
+
+    instance.state = "exiting";
+    createExitGhost(instance, exitDuration);
+    finishClearSticky(instance);
+  }
+
+  function createExitGhost(instance, exitDuration) {
+    var el = instance.el;
+    var rect = el.getBoundingClientRect();
+    var ghost = el.cloneNode(true);
+    var ghostHost = el.parentNode || document.body;
+
+    ghost.classList.remove("dsh-is-sticky");
+    ghost.classList.remove("dsh-anim-fade-in-down");
+    ghost.classList.remove("dsh-sticky-target");
+    ghost.classList.add("dsh-exit-ghost");
+    ghost.classList.add("dsh-anim-slide-up-out");
+    ghost.removeAttribute("id");
+    ghost.removeAttribute("data-dsh-enabled");
+    ghost.removeAttribute("data-dsh-delay");
+    ghost.removeAttribute("data-dsh-up-hide-distance");
+    ghost.removeAttribute("data-dsh-down-animation");
+    ghost.removeAttribute("data-dsh-duration");
+    ghost.removeAttribute("data-dsh-easing");
+    ghost.removeAttribute("data-dsh-devices");
+    ghost.removeAttribute("data-dsh-had-native");
+    ghost.style.setProperty("--dsh-exit-duration", exitDuration + "ms");
+    ghost.style.setProperty("--dsh-anim-easing", getComputedStyle(el).getPropertyValue("--dsh-anim-easing") || "cubic-bezier(0.22,1,0.36,1)");
+    ghost.style.left = rect.left + "px";
+    ghost.style.top = rect.top + "px";
+    ghost.style.width = rect.width + "px";
+    ghost.style.height = rect.height + "px";
+
+    ghostHost.appendChild(ghost);
+
+    var cleanup = function () {
+      if (ghost && ghost.parentNode) {
+        ghost.parentNode.removeChild(ghost);
+      }
+    };
+
+    ghost.addEventListener("animationend", function (event) {
+      if (event.target !== ghost) {
+        return;
+      }
+      cleanup();
+    });
+
+    window.setTimeout(cleanup, exitDuration + 120);
   }
 
   function syncInstance(instance) {
@@ -108,22 +258,38 @@
     var delta = scrollY - instance.lastScrollY;
     var scrollingDown = delta > SCROLL_DELTA_THRESHOLD;
     var scrollingUp = delta < -SCROLL_DELTA_THRESHOLD;
-    var shouldStick = scrollingDown && scrollY >= instance.anchorTop + instance.delay;
+    var shouldEnterSticky = scrollingDown && scrollY >= instance.anchorTop + instance.delay;
+    var shouldReleaseSticky = scrollingUp && scrollY <= instance.anchorTop + instance.upHideDistance;
+    var passedReenterGuard = scrollY >= instance.lastExitScrollY + REENTER_SCROLL_GUARD;
 
     instance.lastScrollY = scrollY;
 
     if (!allowed) {
-      clearSticky(instance);
+      finishClearSticky(instance);
       return;
     }
 
-    if (scrollingUp) {
-      clearSticky(instance);
+    if (instance.state === "exiting") {
+      if (shouldEnterSticky) {
+        cancelExit(instance);
+      }
       return;
     }
 
-    if (shouldStick) {
-      applySticky(instance);
+    if (!instance.isSticky) {
+      if (shouldEnterSticky && passedReenterGuard) {
+        applySticky(instance);
+      }
+      return;
+    }
+
+    if (shouldReleaseSticky) {
+      startExit(instance);
+      return;
+    }
+
+    if (instance.state === "normal") {
+      instance.state = "stuck";
     }
   }
 
@@ -153,7 +319,7 @@
 
     resizeTimer = window.setTimeout(function () {
       instances.forEach(function (instance) {
-        clearSticky(instance);
+        finishClearSticky(instance);
         measure(instance);
       });
       requestSync();
@@ -165,8 +331,7 @@
       return;
     }
 
-    var enabled = el.getAttribute("data-dsh-enabled");
-    if (enabled !== "yes") {
+    if (el.getAttribute("data-dsh-enabled") !== "yes") {
       return;
     }
 
@@ -195,14 +360,22 @@
       el: el,
       placeholder: placeholder,
       delay: Math.max(0, parseIntSafe(el.getAttribute("data-dsh-delay"), 0)),
+      upHideDistance: Math.max(0, parseIntSafe(el.getAttribute("data-dsh-up-hide-distance"), 250)),
       animation: el.getAttribute("data-dsh-down-animation") || "fade_in_down",
+      duration: duration,
       devices: devices.length ? devices : ["desktop", "tablet", "mobile"],
       anchorTop: 0,
       left: 0,
       width: 0,
       height: 0,
       isSticky: false,
+      state: "normal",
       lastScrollY: window.scrollY || window.pageYOffset || 0,
+      lastExitScrollY: -Infinity,
+      entryEndHandler: null,
+      exitEndHandler: null,
+      entryFallbackTimer: null,
+      exitFallbackTimer: null,
     };
 
     measure(instance);
