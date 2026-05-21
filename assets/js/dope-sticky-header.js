@@ -188,9 +188,11 @@
       scrollY = 0;
     }
 
-    // Determine if we should be sticky with a 10px hysteresis buffer to prevent boundary flickering
+    // Determine if we should be sticky. Use a 10px hysteresis buffer to prevent boundary flickering,
+    // but disable it for interactive scroll_linked reveal type to ensure seamless return to original position.
     var stickyThreshold = instance.anchorTop + instance.delay;
-    var shouldStick = allowed && (instance.isSticky ? (scrollY >= stickyThreshold - 10) : (scrollY >= stickyThreshold));
+    var useHysteresis = instance.revealType !== "scroll_linked";
+    var shouldStick = allowed && (instance.isSticky && useHysteresis ? (scrollY >= stickyThreshold - 10) : (scrollY >= stickyThreshold));
 
     if (shouldStick) {
       if (!instance.isSticky) {
