@@ -5,6 +5,7 @@
   var rafSyncRequested = false;
   var resizeTimer = null;
   var SCROLL_DELTA_THRESHOLD = 2;
+  var lastWindowWidth = window.innerWidth || document.documentElement.clientWidth || 0;
 
   function parseIntSafe(value, fallback) {
     var parsed = Number(value);
@@ -239,6 +240,12 @@
   }
 
   function onResize() {
+    var newWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    if (newWidth === lastWindowWidth) {
+      return; // Ignore height-only resizes (like mobile address bar toggles)
+    }
+    lastWindowWidth = newWidth;
+
     if (resizeTimer) {
       window.clearTimeout(resizeTimer);
     }
