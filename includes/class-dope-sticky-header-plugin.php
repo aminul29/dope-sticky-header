@@ -144,6 +144,23 @@ final class Dope_Sticky_Header_Plugin {
 		);
 
 		$element->add_control(
+			'dsh_direction_aware',
+			array(
+				'label'            => esc_html__( 'Direction-Aware (Hide on Scroll Down)', 'dope-sticky-header' ),
+				'type'             => Controls_Manager::SWITCHER,
+				'label_on'         => esc_html__( 'Yes', 'dope-sticky-header' ),
+				'label_off'        => esc_html__( 'No', 'dope-sticky-header' ),
+				'return_value'     => 'yes',
+				'default'          => '',
+				'condition'        => array(
+					'dsh_enable_sticky' => 'yes',
+				),
+				'frontend_available' => true,
+				'render_type'      => 'none',
+			)
+		);
+
+		$element->add_control(
 			'dsh_sticky_devices',
 			array(
 				'label'              => esc_html__( 'Sticky Devices', 'dope-sticky-header' ),
@@ -284,6 +301,8 @@ final class Dope_Sticky_Header_Plugin {
 			$easing = 'cubic-bezier(0.22,1,0.36,1)';
 		}
 
+		$direction_aware = $element->get_settings_for_display( 'dsh_direction_aware' );
+
 		$native_sticky = $element->get_settings( 'sticky' );
 		if ( ! empty( $native_sticky ) ) {
 			$element->set_settings( 'sticky', '' );
@@ -301,6 +320,7 @@ final class Dope_Sticky_Header_Plugin {
 		$element->add_render_attribute( '_wrapper', 'data-dsh-easing', $easing );
 		$element->add_render_attribute( '_wrapper', 'data-dsh-devices', implode( ',', array_map( 'sanitize_key', $devices ) ) );
 		$element->add_render_attribute( '_wrapper', 'data-dsh-had-native', ! empty( $native_sticky ) ? 'yes' : 'no' );
+		$element->add_render_attribute( '_wrapper', 'data-dsh-direction-aware', 'yes' === $direction_aware ? 'yes' : 'no' );
 
 		$this->enqueue_assets_once();
 	}

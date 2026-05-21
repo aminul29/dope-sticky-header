@@ -14,9 +14,18 @@
   right: auto;
   z-index: 9999;
   margin: 0 !important;
-  transform: translateZ(0);
+  transform: translateY(0) translateZ(0);
   backface-visibility: hidden;
-  will-change: transform, opacity;
+  will-change: transform, opacity, top;
+  transition: transform var(--dsh-anim-duration) var(--dsh-anim-easing),
+              opacity var(--dsh-anim-duration) var(--dsh-anim-easing),
+              top 200ms var(--dsh-anim-easing);
+}
+
+.dsh-sticky-target.dsh-is-sticky.dsh-sticky-hide {
+  transform: translateY(-100%) translateZ(0);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .dsh-sticky-target.dsh-anim-fade-in-down {
