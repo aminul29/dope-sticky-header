@@ -26,23 +26,6 @@
   animation-fill-mode: both;
 }
 
-.dsh-sticky-target.dsh-anim-slide-up-out {
-  animation-name: dshSlideUpOut;
-  animation-duration: var(--dsh-exit-duration, var(--dsh-anim-duration));
-  animation-timing-function: var(--dsh-anim-easing);
-  animation-fill-mode: both;
-}
-
-.dsh-exit-ghost {
-  position: fixed !important;
-  z-index: 9999;
-  margin: 0 !important;
-  pointer-events: none !important;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  will-change: transform;
-}
-
 @keyframes dshFadeInDown {
   0% {
     opacity: 0;
@@ -52,15 +35,5 @@
   100% {
     opacity: 1;
     transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes dshSlideUpOut {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-
-  100% {
-    transform: translate3d(0, -100%, 0);
   }
 }
