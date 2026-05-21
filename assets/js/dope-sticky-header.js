@@ -42,11 +42,6 @@
   }
 
   function clearInstanceTimers(instance) {
-    if (instance.entryFallbackTimer) {
-      window.clearTimeout(instance.entryFallbackTimer);
-      instance.entryFallbackTimer = null;
-    }
-
     if (instance.exitFallbackTimer) {
       window.clearTimeout(instance.exitFallbackTimer);
       instance.exitFallbackTimer = null;
@@ -55,11 +50,6 @@
 
   function removeInstanceAnimationListeners(instance) {
     var el = instance.el;
-
-    if (instance.entryEndHandler) {
-      el.removeEventListener("animationend", instance.entryEndHandler);
-      instance.entryEndHandler = null;
-    }
 
     if (instance.exitEndHandler) {
       el.removeEventListener("animationend", instance.exitEndHandler);
@@ -80,16 +70,6 @@
     }
 
     instance.anchorTop = rect.top + (window.scrollY || window.pageYOffset || 0);
-  }
-
-  function finalizeEntry(instance) {
-    if (!instance.isSticky) {
-      instance.state = "normal";
-      return;
-    }
-
-    instance.el.classList.remove("dsh-anim-fade-in-down");
-    instance.state = "stuck";
   }
 
   function finishClearSticky(instance) {
@@ -153,29 +133,14 @@
 
     instance.isSticky = true;
 
-    if (instance.animation === "fade_in_down" && instance.duration > 0) {
-      instance.state = "entering";
+    if (instance.animation !== "none") {
       el.classList.remove("dsh-anim-fade-in-down");
       void el.offsetWidth;
-      el.classList.add("dsh-anim-fade-in-down");
-
-      instance.entryEndHandler = function (event) {
-        if (event.target !== el) {
-          return;
-        }
-        finalizeEntry(instance);
-      };
-
-      el.addEventListener("animationend", instance.entryEndHandler);
-
-      instance.entryFallbackTimer = window.setTimeout(function () {
-        finalizeEntry(instance);
-      }, instance.duration + 80);
-
-      return;
+      if (instance.animation === "fade_in_down") {
+        el.classList.add("dsh-anim-fade-in-down");
+      }
     }
 
-    el.classList.remove("dsh-anim-fade-in-down");
     instance.state = "stuck";
   }
 
@@ -372,9 +337,7 @@
       state: "normal",
       lastScrollY: window.scrollY || window.pageYOffset || 0,
       lastExitScrollY: -Infinity,
-      entryEndHandler: null,
       exitEndHandler: null,
-      entryFallbackTimer: null,
       exitFallbackTimer: null,
     };
 
