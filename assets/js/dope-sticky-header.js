@@ -166,24 +166,45 @@
   function syncInstance(instance) {
     var allowed = instance.devices.indexOf(getDeviceType()) !== -1;
     var scrollY = window.scrollY || window.pageYOffset || 0;
-    var delta = scrollY - instance.lastScrollY;
-    var scrollingDown = delta > SCROLL_DELTA_THRESHOLD;
-    var scrollingUp = delta < -SCROLL_DELTA_THRESHOLD;
 
-    // Check if we should be sticky based purely on scroll position
-    var shouldStick = allowed && scrollY >= instance.anchorTop + instance.delay;
+    // Normalize negative scroll values (e.g. bounce on iOS)
+    if (scrollY < 0) {
+      scrollY = 0;
+    }
+
+    // Determine if we should be sticky with a 10px hysteresis buffer to prevent boundary flickering
+    var stickyThreshold = instance.anchorTop + instance.delay;
+    var shouldStick = allowed && (instance.isSticky ? (scrollY >= stickyThreshold - 10) : (scrollY >= stickyThreshold));
 
     if (shouldStick) {
       if (!instance.isSticky) {
         applySticky(instance);
+        instance.lastScrollY = scrollY;
+        instance.scrollAccumulator = 0;
       }
 
-      // If direction-aware, hide on scroll down, show on scroll up
+      var delta = scrollY - instance.lastScrollY;
+
+      // Accumulate scroll distance in the current direction to smooth out recoil/bounce
+      if (delta > 0) {
+        if (instance.scrollAccumulator < 0) {
+          instance.scrollAccumulator = 0;
+        }
+        instance.scrollAccumulator += delta;
+      } else if (delta < 0) {
+        if (instance.scrollAccumulator > 0) {
+          instance.scrollAccumulator = 0;
+        }
+        instance.scrollAccumulator += delta;
+      }
+
+      // If direction-aware, hide on scroll down (with 20px tolerance), show on scroll up (with 15px tolerance)
       if (instance.directionAware) {
-        // Only hide if we have scrolled down past the trigger point + a small threshold
-        if (scrollingDown && scrollY > instance.anchorTop + instance.delay + 60) {
+        var toleranceDown = 20;
+        var toleranceUp = 15;
+        if (instance.scrollAccumulator > toleranceDown && scrollY > stickyThreshold + 100) {
           hideSticky(instance);
-        } else if (scrollingUp) {
+        } else if (instance.scrollAccumulator < -toleranceUp) {
           showSticky(instance);
         }
       } else {
@@ -195,9 +216,7 @@
       }
     }
 
-    if (Math.abs(delta) > SCROLL_DELTA_THRESHOLD || scrollY === 0) {
-      instance.lastScrollY = scrollY;
-    }
+    instance.lastScrollY = scrollY;
   }
 
   function syncAll() {
@@ -279,6 +298,7 @@
       height: 0,
       isSticky: false,
       lastScrollY: window.scrollY || window.pageYOffset || 0,
+      scrollAccumulator: 0,
     };
 
     measure(instance);
